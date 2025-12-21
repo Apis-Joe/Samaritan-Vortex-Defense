@@ -2,95 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 0 0% 2%;
+    --foreground: 0 0% 95%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 4%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 100% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 60%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 0 100% 40%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 0 100% 50%;
 
-    --radius: 0.5rem;
+    --radius: 0.25rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Custom Samaritan theme colors */
+    --samaritan-red: 0 100% 50%;
+    --samaritan-red-glow: 0 100% 60%;
+    --samaritan-dark: 0 0% 3%;
+    --samaritan-panel: 0 0% 6%;
+    --samaritan-border: 0 0% 20%;
+    --samaritan-text: 0 0% 70%;
+    --samaritan-highlight: 0 0% 100%;
+    --samaritan-warning: 30 100% 50%;
+    --samaritan-success: 120 100% 35%;
+    --samaritan-cyan: 180 100% 50%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Vortex colors */
+    --vortex-core: 0 100% 50%;
+    --vortex-ring-1: 0 100% 45%;
+    --vortex-ring-2: 0 100% 35%;
+    --vortex-ring-3: 0 100% 25%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Typography */
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Orbitron', sans-serif;
 
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Shadows & Glows */
+    --glow-red: 0 0 30px hsl(var(--samaritan-red) / 0.5);
+    --glow-red-intense: 0 0 60px hsl(var(--samaritan-red) / 0.8);
   }
 }
 
@@ -101,5 +71,203 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-mono);
   }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+  }
+
+  .text-glow-intense {
+    text-shadow: 0 0 10px currentColor, 0 0 30px currentColor, 0 0 50px currentColor;
+  }
+
+  .box-glow {
+    box-shadow: var(--glow-red);
+  }
+
+  .box-glow-intense {
+    box-shadow: var(--glow-red-intense);
+  }
+
+  .scanline {
+    background: linear-gradient(
+      transparent 50%,
+      hsl(var(--samaritan-red) / 0.03) 50%
+    );
+    background-size: 100% 4px;
+    pointer-events: none;
+  }
+
+  .grid-pattern {
+    background-image: 
+      linear-gradient(hsl(var(--samaritan-border) / 0.3) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--samaritan-border) / 0.3) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+}
+
+/* Vortex Animation Keyframes */
+@keyframes vortex-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes vortex-spin-reverse {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes vortex-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes vortex-core-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 20px hsl(var(--samaritan-red)), 
+                0 0 40px hsl(var(--samaritan-red) / 0.5),
+                0 0 60px hsl(var(--samaritan-red) / 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 40px hsl(var(--samaritan-red)), 
+                0 0 80px hsl(var(--samaritan-red) / 0.6),
+                0 0 120px hsl(var(--samaritan-red) / 0.4);
+  }
+}
+
+@keyframes threat-incoming {
+  0% { 
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+  50% { opacity: 1; }
+  100% { 
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes threat-redirect {
+  0% { 
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+  }
+  30% { 
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% { 
+    transform: translate(200%, -200%) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@keyframes data-stream {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+  75% { opacity: 0.95; }
+}
+
+@keyframes terminal-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-vortex-spin {
+  animation: vortex-spin 20s linear infinite;
+}
+
+.animate-vortex-spin-reverse {
+  animation: vortex-spin-reverse 15s linear infinite;
+}
+
+.animate-vortex-spin-fast {
+  animation: vortex-spin 8s linear infinite;
+}
+
+.animate-vortex-pulse {
+  animation: vortex-pulse 2s ease-in-out infinite;
+}
+
+.animate-vortex-core-pulse {
+  animation: vortex-core-pulse 1.5s ease-in-out infinite;
+}
+
+.animate-threat-incoming {
+  animation: threat-incoming 1.5s ease-out forwards;
+}
+
+.animate-threat-redirect {
+  animation: threat-redirect 2s ease-in-out forwards;
+}
+
+.animate-data-stream {
+  animation: data-stream 4s linear infinite;
+}
+
+.animate-flicker {
+  animation: flicker 0.1s infinite;
+}
+
+.animate-terminal-blink {
+  animation: terminal-blink 1s step-end infinite;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--samaritan-dark));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--samaritan-border));
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--samaritan-red) / 0.5);
 }
