@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.get-visitor-ip]
 verify_jwt = false
+
+[functions.scan-url]
+verify_jwt = false
