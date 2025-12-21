@@ -8,7 +8,9 @@ import TerminalLog from "@/components/TerminalLog";
 import TestPanel from "@/components/TestPanel";
 import ThreatVisualization from "@/components/ThreatVisualization";
 import ThreatIntelPanel from "@/components/ThreatIntelPanel";
+import URLScannerPanel from "@/components/URLScannerPanel";
 import { ThreatIntelligence } from "@/hooks/useThreatIntelligence";
+import { URLScanResult } from "@/hooks/useURLScanner";
 
 interface Threat {
   id: string;
@@ -81,6 +83,35 @@ const Index = () => {
     }
     if (intel.abuseData && intel.abuseData.totalReports > 0) {
       addLog("warning", `${intel.abuseData.totalReports} abuse reports on record`);
+    }
+  }, [addLog]);
+
+  const handleURLThreatDetected = useCallback((result: URLScanResult) => {
+    const severityMap: Record<string, Threat["severity"]> = {
+      'critical': 'critical',
+      'high': 'high',
+      'medium': 'medium',
+      'low': 'low',
+      'safe': 'low'
+    };
+
+    const newThreat: Threat = {
+      id: Date.now().toString(),
+      type: `Malicious URL (${result.stats.malicious} flags)`,
+      source: result.url,
+      severity: severityMap[result.threatLevel] || 'medium',
+      status: "detected",
+      timestamp: new Date(),
+    };
+
+    setActiveThreat(newThreat);
+    setThreats((prev) => [newThreat, ...prev]);
+    addLog("error", `MALICIOUS URL DETECTED: ${result.url}`);
+    addLog("warning", `Flagged by ${result.stats.malicious} malicious + ${result.stats.suspicious} suspicious engines`);
+    
+    if (result.flaggedEngines.length > 0) {
+      const engines = result.flaggedEngines.slice(0, 3).map(e => e.engine).join(', ');
+      addLog("warning", `Detection engines: ${engines}`);
     }
   }, [addLog]);
 
@@ -209,6 +240,7 @@ const Index = () => {
             {/* Right Panel - Threat Monitor & Intelligence */}
             <div className="lg:col-span-3 space-y-6">
               <ThreatIntelPanel onThreatDetected={handleRealThreatDetected} />
+              <URLScannerPanel onThreatDetected={handleURLThreatDetected} />
               <ThreatPanel threats={threats} activeThreat={activeThreat} />
             </div>
           </div>
