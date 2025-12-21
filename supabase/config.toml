@@ -1,1 +1,7 @@
 project_id = "aoivnbfqpyrqfmoqjtur"
+
+[functions.check-ip-threat]
+verify_jwt = false
+
+[functions.get-visitor-ip]
+verify_jwt = false

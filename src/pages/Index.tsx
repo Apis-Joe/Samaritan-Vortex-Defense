@@ -7,6 +7,8 @@ import DataStream from "@/components/DataStream";
 import TerminalLog from "@/components/TerminalLog";
 import TestPanel from "@/components/TestPanel";
 import ThreatVisualization from "@/components/ThreatVisualization";
+import ThreatIntelPanel from "@/components/ThreatIntelPanel";
+import { ThreatIntelligence } from "@/hooks/useThreatIntelligence";
 
 interface Threat {
   id: string;
@@ -51,6 +53,36 @@ const Index = () => {
       },
     ]);
   }, []);
+
+  const handleRealThreatDetected = useCallback((intel: ThreatIntelligence) => {
+    const severityMap: Record<string, Threat["severity"]> = {
+      'critical': 'critical',
+      'high': 'high', 
+      'medium': 'medium',
+      'low': 'low',
+      'safe': 'low'
+    };
+
+    const newThreat: Threat = {
+      id: Date.now().toString(),
+      type: `Real Threat (${intel.riskScore}% risk)`,
+      source: intel.ip,
+      severity: severityMap[intel.threatLevel] || 'medium',
+      status: "detected",
+      timestamp: new Date(),
+    };
+
+    setActiveThreat(newThreat);
+    setThreats((prev) => [newThreat, ...prev]);
+    addLog("error", `REAL THREAT DETECTED: ${intel.ip} - ${intel.threatLevel.toUpperCase()} risk (${intel.riskScore}%)`);
+    
+    if (intel.geolocation) {
+      addLog("warning", `Origin: ${intel.geolocation.city}, ${intel.geolocation.country} (${intel.geolocation.isp})`);
+    }
+    if (intel.abuseData && intel.abuseData.totalReports > 0) {
+      addLog("warning", `${intel.abuseData.totalReports} abuse reports on record`);
+    }
+  }, [addLog]);
 
   const handleToggleSystem = () => {
     setIsActive((prev) => {
@@ -174,8 +206,9 @@ const Index = () => {
               />
             </div>
 
-            {/* Right Panel - Threat Monitor */}
-            <div className="lg:col-span-3">
+            {/* Right Panel - Threat Monitor & Intelligence */}
+            <div className="lg:col-span-3 space-y-6">
+              <ThreatIntelPanel onThreatDetected={handleRealThreatDetected} />
               <ThreatPanel threats={threats} activeThreat={activeThreat} />
             </div>
           </div>
