@@ -6,18 +6,17 @@ import SystemStatus from "@/components/SystemStatus";
 import DataStream from "@/components/DataStream";
 import TerminalLog from "@/components/TerminalLog";
 import TestPanel from "@/components/TestPanel";
-import ThreatVisualization from "@/components/ThreatVisualization";
-import ThreatIntelPanel from "@/components/ThreatIntelPanel";
-import URLScannerPanel from "@/components/URLScannerPanel";
-import VortexSpeedMetrics from "@/components/VortexSpeedMetrics";
-import RedirectDestinations, { RedirectDestination } from "@/components/RedirectDestinations";
-import RiskAssessment from "@/components/RiskAssessment";
+import VortexStatsPanel from "@/components/VortexStatsPanel";
+import AttackFlowProcess from "@/components/AttackFlowProcess";
+import NeutralizationLog from "@/components/NeutralizationLog";
+import AttackDestinationsPanel from "@/components/AttackDestinationsPanel";
+import ConnectionSecurityMonitor from "@/components/ConnectionSecurityMonitor";
+import AdvancedRiskAssessment from "@/components/AdvancedRiskAssessment";
 import QuantumDefensePanel from "@/components/QuantumDefensePanel";
 import ZeroDayTrainingMode from "@/components/ZeroDayTrainingMode";
 import SelfAuditSystem from "@/components/SelfAuditSystem";
 import OriginAnchorSystem from "@/components/OriginAnchorSystem";
-import { ThreatIntelligence } from "@/hooks/useThreatIntelligence";
-import { URLScanResult } from "@/hooks/useURLScanner";
+import { RedirectDestination } from "@/components/AttackDestinationsPanel";
 
 interface Threat {
   id: string;
@@ -25,6 +24,19 @@ interface Threat {
   source: string;
   severity: "low" | "medium" | "high" | "critical";
   status: "detected" | "processing" | "redirected" | "neutralized";
+  timestamp: Date;
+}
+
+interface NeutralizedThreat {
+  id: string;
+  type: string;
+  sourceIP: string;
+  destination: string;
+  destinationName: string;
+  speedMultiplier: number;
+  neutralizedPercent: number;
+  damagePrevented: number;
+  codeFragments: number;
   timestamp: Date;
 }
 
@@ -39,279 +51,155 @@ const generateIP = () => {
   return `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
 };
 
-const destinationNames: Record<RedirectDestination, string> = {
-  "attacker.origin.ip": "REVERSE TO ATTACKER",
-  "void.blackhole.sys": "BLACK HOLE VOID",
-  "honeypot.trap.net": "HONEYPOT TRAP",
-  "null.route.void": "NULL ROUTE",
-  "reverse.tunnel.origin": "REVERSE TUNNEL",
-};
+const destinations: RedirectDestination[] = [
+  "attacker.origin.ip", "void.blackhole.sys", "honeypot.trap.net", "null.route.void", "reverse.tunnel.origin"
+];
 
 const Index = () => {
   const [isActive, setIsActive] = useState(false);
   const [threats, setThreats] = useState<Threat[]>([]);
+  const [neutralizedThreats, setNeutralizedThreats] = useState<NeutralizedThreat[]>([]);
   const [activeThreat, setActiveThreat] = useState<Threat | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([
     { id: "1", timestamp: new Date(), type: "info", message: "System initialized" },
     { id: "2", timestamp: new Date(), type: "info", message: "Vortex core loaded" },
     { id: "3", timestamp: new Date(), type: "success", message: "Defense protocols ready" },
   ]);
-  const [threatPhase, setThreatPhase] = useState<"incoming" | "captured" | "processing" | "redirecting" | "complete" | null>(null);
-  const [currentThreatType, setCurrentThreatType] = useState("");
-  const [redirectDestination, setRedirectDestination] = useState<RedirectDestination>("attacker.origin.ip");
+  const [flowPhase, setFlowPhase] = useState<'idle' | 'detecting' | 'aspirating' | 'redirecting'>('idle');
+  const [destinationStats, setDestinationStats] = useState<Record<RedirectDestination, number>>({
+    "attacker.origin.ip": 0, "void.blackhole.sys": 0, "honeypot.trap.net": 0, "null.route.void": 0, "reverse.tunnel.origin": 0
+  });
+  const [stats, setStats] = useState({ aspirated: 0, redirects: 0, executions: 0, damageMB: 0, codeCaptured: 0 });
 
   const addLog = useCallback((type: LogEntry["type"], message: string) => {
-    setLogs((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        timestamp: new Date(),
-        type,
-        message,
-      },
-    ]);
+    setLogs((prev) => [...prev, { id: Date.now().toString(), timestamp: new Date(), type, message }]);
   }, []);
-
-  const handleRealThreatDetected = useCallback((intel: ThreatIntelligence) => {
-    const severityMap: Record<string, Threat["severity"]> = {
-      'critical': 'critical',
-      'high': 'high', 
-      'medium': 'medium',
-      'low': 'low',
-      'safe': 'low'
-    };
-
-    const newThreat: Threat = {
-      id: Date.now().toString(),
-      type: `Real Threat (${intel.riskScore}% risk)`,
-      source: intel.ip,
-      severity: severityMap[intel.threatLevel] || 'medium',
-      status: "detected",
-      timestamp: new Date(),
-    };
-
-    setActiveThreat(newThreat);
-    setThreats((prev) => [newThreat, ...prev]);
-    addLog("error", `REAL THREAT DETECTED: ${intel.ip} - ${intel.threatLevel.toUpperCase()} risk (${intel.riskScore}%)`);
-    
-    if (intel.geolocation) {
-      addLog("warning", `Origin: ${intel.geolocation.city}, ${intel.geolocation.country} (${intel.geolocation.isp})`);
-    }
-    if (intel.abuseData && intel.abuseData.totalReports > 0) {
-      addLog("warning", `${intel.abuseData.totalReports} abuse reports on record`);
-    }
-  }, [addLog]);
-
-  const handleURLThreatDetected = useCallback((result: URLScanResult) => {
-    const severityMap: Record<string, Threat["severity"]> = {
-      'critical': 'critical',
-      'high': 'high',
-      'medium': 'medium',
-      'low': 'low',
-      'safe': 'low'
-    };
-
-    const newThreat: Threat = {
-      id: Date.now().toString(),
-      type: `Malicious URL (${result.stats.malicious} flags)`,
-      source: result.url,
-      severity: severityMap[result.threatLevel] || 'medium',
-      status: "detected",
-      timestamp: new Date(),
-    };
-
-    setActiveThreat(newThreat);
-    setThreats((prev) => [newThreat, ...prev]);
-    addLog("error", `MALICIOUS URL DETECTED: ${result.url}`);
-    addLog("warning", `Flagged by ${result.stats.malicious} malicious + ${result.stats.suspicious} suspicious engines`);
-    
-    if (result.flaggedEngines.length > 0) {
-      const engines = result.flaggedEngines.slice(0, 3).map(e => e.engine).join(', ');
-      addLog("warning", `Detection engines: ${engines}`);
-    }
-  }, [addLog]);
 
   const handleToggleSystem = () => {
     setIsActive((prev) => {
-      const newState = !prev;
-      addLog(newState ? "success" : "warning", newState ? "VORTEX ACTIVATED - Quantum aspiration online" : "VORTEX DEACTIVATED - System in standby");
-      return newState;
+      addLog(!prev ? "success" : "warning", !prev ? "VORTEX ACTIVATED - Quantum aspiration online" : "VORTEX DEACTIVATED");
+      return !prev;
     });
   };
 
-  const handleSimulateThreat = useCallback(
-    async (type: string) => {
-      const severities: Threat["severity"][] = ["low", "medium", "high", "critical"];
-      const severity = severities[Math.floor(Math.random() * severities.length)];
-      const sourceIP = generateIP();
+  const handleSimulateThreat = useCallback(async (type: string) => {
+    const severities: Threat["severity"][] = ["low", "medium", "high", "critical"];
+    const sourceIP = generateIP();
+    const destination = destinations[Math.floor(Math.random() * destinations.length)];
 
-      const newThreat: Threat = {
-        id: Date.now().toString(),
-        type,
-        source: sourceIP,
-        severity,
-        status: "detected",
-        timestamp: new Date(),
-      };
+    const newThreat: Threat = {
+      id: Date.now().toString(), type, source: sourceIP,
+      severity: severities[Math.floor(Math.random() * severities.length)],
+      status: "detected", timestamp: new Date(),
+    };
 
-      setCurrentThreatType(type);
-      setActiveThreat(newThreat);
-      setThreats((prev) => [newThreat, ...prev]);
-      addLog("error", `⚡ THREAT DETECTED: ${type} attack from ${sourceIP}`);
-      addLog("info", `Vortex response time: 0.003ns (quantum speed)`);
-      setThreatPhase("incoming");
+    setActiveThreat(newThreat);
+    setThreats((prev) => [newThreat, ...prev]);
+    addLog("error", `⚡ THREAT DETECTED: ${type} from ${sourceIP}`);
+    setFlowPhase("detecting");
 
-      // Phase 1: Instant Aspiration (0.5s for visual)
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setThreatPhase("captured");
-      addLog("warning", "⚡ INSTANT ASPIRATION - Attack captured before execution");
+    await new Promise((r) => setTimeout(r, 500));
+    setFlowPhase("aspirating");
+    addLog("warning", "⚡ INSTANT ASPIRATION - Attack captured");
 
-      // Phase 2: Captured (0.3s)
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      setThreatPhase("processing");
-      setThreats((prev) =>
-        prev.map((t) => (t.id === newThreat.id ? { ...t, status: "processing" } : t))
-      );
-      addLog("info", "Analyzing threat signature (zero execution window)...");
+    await new Promise((r) => setTimeout(r, 800));
+    setFlowPhase("redirecting");
+    setThreats((prev) => prev.map((t) => t.id === newThreat.id ? { ...t, status: "redirected" } : t));
 
-      // Phase 3: Processing (1s)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setThreatPhase("redirecting");
-      setThreats((prev) =>
-        prev.map((t) => (t.id === newThreat.id ? { ...t, status: "redirected" } : t))
-      );
-      addLog("info", `Redirecting to: ${redirectDestination}`);
-      addLog("warning", `Destination: ${destinationNames[redirectDestination]}`);
+    await new Promise((r) => setTimeout(r, 800));
+    setThreats((prev) => prev.map((t) => t.id === newThreat.id ? { ...t, status: "neutralized" } : t));
+    
+    const neutralized: NeutralizedThreat = {
+      id: newThreat.id, type, sourceIP, destination,
+      destinationName: destination, speedMultiplier: Math.floor(Math.random() * 40000) + 5000,
+      neutralizedPercent: 100, damagePrevented: Math.random() * 15 + 1, codeFragments: Math.floor(Math.random() * 50) + 10,
+      timestamp: new Date(),
+    };
+    setNeutralizedThreats((prev) => [neutralized, ...prev].slice(0, 20));
+    setDestinationStats((prev) => ({ ...prev, [destination]: (prev[destination] || 0) + 1 }));
+    setStats((prev) => ({
+      aspirated: prev.aspirated + 1, redirects: prev.redirects + 1, executions: 0,
+      damageMB: prev.damageMB + neutralized.damagePrevented, codeCaptured: prev.codeCaptured + neutralized.codeFragments
+    }));
+    addLog("success", `✓ NEUTRALIZED via ${destination}`);
+    setFlowPhase("idle");
+    setActiveThreat(null);
+  }, [addLog]);
 
-      // Phase 4: Redirecting (1s)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setThreatPhase("complete");
-      setThreats((prev) =>
-        prev.map((t) => (t.id === newThreat.id ? { ...t, status: "neutralized" } : t))
-      );
-      addLog("success", `✓ THREAT NEUTRALIZED via ${destinationNames[redirectDestination]}`);
-
-      // Phase 5: Complete (0.5s)
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setThreatPhase(null);
-      setActiveThreat(null);
-      setCurrentThreatType("");
-    },
-    [addLog, redirectDestination]
-  );
-
-  // Auto-generate random threats when active
   useEffect(() => {
     if (!isActive) return;
-
     const interval = setInterval(() => {
-      if (!activeThreat && Math.random() > 0.7) {
-        const types = ["DDoS", "Phishing", "Malware", "Intrusion"];
+      if (!activeThreat && Math.random() > 0.6) {
+        const types = ["DDoS", "Phishing", "Malware", "Intrusion", "Buffer Overflow", "Privilege Escalation"];
         handleSimulateThreat(types[Math.floor(Math.random() * types.length)]);
       }
-    }, 8000);
-
+    }, 5000);
     return () => clearInterval(interval);
   }, [isActive, activeThreat, handleSimulateThreat]);
 
   return (
-    <div className="min-h-screen bg-background overflow-hidden">
-      {/* Background effects */}
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <DataStream />
       <div className="fixed inset-0 scanline pointer-events-none" />
-
-      {/* Header */}
       <Header />
 
-      {/* Main Content */}
-      <main className="pt-24 pb-8 px-4 md:px-8 min-h-screen">
-        <div className="max-w-screen-2xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
-            {/* Left Panel - System Status & Controls */}
-            <div className="lg:col-span-3 space-y-4">
-              <SystemStatus
-                isActive={isActive}
-                threatsBlocked={threats.filter((t) => t.status === "neutralized").length}
-              />
-              <TestPanel
-                onSimulateThreat={handleSimulateThreat}
-                onToggleSystem={handleToggleSystem}
-                isActive={isActive}
-                isProcessing={!!activeThreat}
-              />
-              <RedirectDestinations
-                selectedDestination={redirectDestination}
-                onSelectDestination={setRedirectDestination}
-                isProcessing={!!activeThreat}
-                currentPhase={threatPhase}
-              />
+      <main className="pt-20 pb-8 px-4 md:px-6">
+        <div className="max-w-screen-2xl mx-auto space-y-4">
+          {/* Stats Panel */}
+          <VortexStatsPanel isActive={isActive} threatsAspirated={stats.aspirated} redirects={stats.redirects}
+            executions={stats.executions} damagePreventedMB={stats.damageMB} codeCaptured={stats.codeCaptured} responseTimeMs={0.046} />
+
+          {/* Main Grid: Vortex + Tests + Destinations */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-7 space-y-4">
+              <div className="bg-card border border-border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-display text-sm text-primary tracking-wider">VORTEX CORE</h3>
+                  <button onClick={handleToggleSystem}
+                    className={`px-3 py-1 text-xs font-mono rounded border ${isActive ? 'border-emerald-500 text-emerald-400' : 'border-border text-muted-foreground'}`}>
+                    {isActive ? 'ACTIVE' : 'OFF'}
+                  </button>
+                </div>
+                <div className="flex justify-center items-center min-h-[300px]">
+                  <Vortex isActive={isActive} threatLevel={activeThreat ? 2 : 0} processingThreat={!!activeThreat} />
+                </div>
+              </div>
+              <AttackFlowProcess phase={flowPhase} />
             </div>
 
-            {/* Center - Vortex Display */}
-            <div className="lg:col-span-6 flex flex-col items-center justify-center relative min-h-[500px] md:min-h-[600px]">
-              {/* Speed Metrics */}
-              <VortexSpeedMetrics
-                isActive={isActive}
-                isProcessing={!!activeThreat}
-                threatLevel={activeThreat ? (activeThreat.severity === "critical" ? 3 : activeThreat.severity === "high" ? 2 : 1) : 0}
-              />
-              
-              <ThreatVisualization
-                threatActive={!!activeThreat}
-                threatType={currentThreatType}
-                phase={threatPhase}
-              />
-              <Vortex
-                isActive={isActive}
-                threatLevel={activeThreat ? (activeThreat.severity === "critical" ? 3 : activeThreat.severity === "high" ? 2 : 1) : 0}
-                processingThreat={!!activeThreat}
-              />
-            </div>
-
-            {/* Right Panel - Threat Monitor & Intelligence */}
-            <div className="lg:col-span-3 space-y-4">
-              <ThreatIntelPanel onThreatDetected={handleRealThreatDetected} />
-              <URLScannerPanel onThreatDetected={handleURLThreatDetected} />
-              <RiskAssessment isActive={isActive} isProcessing={!!activeThreat} />
-              <ThreatPanel threats={threats} activeThreat={activeThreat} />
+            <div className="lg:col-span-5 space-y-4">
+              <TestPanel onSimulateThreat={handleSimulateThreat} onToggleSystem={handleToggleSystem} isActive={isActive} isProcessing={!!activeThreat} />
+              <AttackDestinationsPanel stats={destinationStats} totalRedirects={stats.redirects} />
             </div>
           </div>
 
-          {/* Advanced Security Systems Row */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <QuantumDefensePanel 
-              isActive={isActive} 
-              onQuantumThreat={(attack) => {
-                addLog("error", `⚛️ QUANTUM ATTACK: ${attack.name} detected (${attack.qubitPower} qubits)`);
-              }}
-            />
-            <ZeroDayTrainingMode 
-              isActive={isActive}
-              onLearningComplete={(patterns, confidence) => {
-                addLog("success", `🧠 AI Training complete: ${patterns} patterns, ${confidence.toFixed(1)}% confidence`);
-              }}
-            />
-            <SelfAuditSystem 
-              isActive={isActive}
-              onVulnerabilityFound={(check) => {
-                addLog("warning", `🔍 VULNERABILITY: ${check.name} - ${check.details}`);
-              }}
-            />
-            <OriginAnchorSystem 
-              isActive={isActive}
-              onRestoreTriggered={() => {
-                addLog("success", "🔒 ORIGIN RESTORED: System restored to verified safe state");
-              }}
-              onIntegrityBreach={(module) => {
-                addLog("error", `⚠️ INTEGRITY BREACH: ${module.name} hash mismatch detected`);
-              }}
-            />
+          {/* Neutralization Log */}
+          <NeutralizationLog threats={neutralizedThreats}
+            latestRedirects={neutralizedThreats.slice(0, 3).map(t => ({ ip: t.sourceIP, destination: t.destination }))} />
+
+          {/* Connection Monitor + Zero-Day Training */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ConnectionSecurityMonitor isActive={isActive} onThreatDetected={(conn) => addLog("warning", `Connection threat: ${conn.fromIP}`)} />
+            <ZeroDayTrainingMode isActive={isActive} onLearningComplete={(p, c) => addLog("success", `AI: ${p} patterns, ${c.toFixed(1)}%`)} />
           </div>
 
-          {/* Bottom - Terminal Log */}
-          <div className="mt-6">
-            <TerminalLog logs={logs} />
+          {/* Quantum + Risk Assessment */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <QuantumDefensePanel isActive={isActive} onQuantumThreat={(a) => addLog("error", `Quantum: ${a.name}`)} />
+            <ThreatPanel threats={threats} activeThreat={activeThreat} />
           </div>
+
+          {/* Advanced Risk Assessment */}
+          <AdvancedRiskAssessment isActive={isActive} onAssessmentComplete={(r) => addLog("info", `Assessment: ${r.type} - ${r.level}`)} />
+
+          {/* Origin Anchor + Self-Audit */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <OriginAnchorSystem isActive={isActive} onRestoreTriggered={() => addLog("success", "Origin restored")} onIntegrityBreach={(m) => addLog("error", `Breach: ${m.name}`)} />
+            <SelfAuditSystem isActive={isActive} onVulnerabilityFound={(c) => addLog("warning", `Vuln: ${c.name}`)} />
+          </div>
+
+          {/* Terminal Log */}
+          <TerminalLog logs={logs} />
         </div>
       </main>
     </div>
