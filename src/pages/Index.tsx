@@ -12,6 +12,10 @@ import URLScannerPanel from "@/components/URLScannerPanel";
 import VortexSpeedMetrics from "@/components/VortexSpeedMetrics";
 import RedirectDestinations, { RedirectDestination } from "@/components/RedirectDestinations";
 import RiskAssessment from "@/components/RiskAssessment";
+import QuantumDefensePanel from "@/components/QuantumDefensePanel";
+import ZeroDayTrainingMode from "@/components/ZeroDayTrainingMode";
+import SelfAuditSystem from "@/components/SelfAuditSystem";
+import OriginAnchorSystem from "@/components/OriginAnchorSystem";
 import { ThreatIntelligence } from "@/hooks/useThreatIntelligence";
 import { URLScanResult } from "@/hooks/useURLScanner";
 
@@ -271,6 +275,37 @@ const Index = () => {
               <RiskAssessment isActive={isActive} isProcessing={!!activeThreat} />
               <ThreatPanel threats={threats} activeThreat={activeThreat} />
             </div>
+          </div>
+
+          {/* Advanced Security Systems Row */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <QuantumDefensePanel 
+              isActive={isActive} 
+              onQuantumThreat={(attack) => {
+                addLog("error", `⚛️ QUANTUM ATTACK: ${attack.name} detected (${attack.qubitPower} qubits)`);
+              }}
+            />
+            <ZeroDayTrainingMode 
+              isActive={isActive}
+              onLearningComplete={(patterns, confidence) => {
+                addLog("success", `🧠 AI Training complete: ${patterns} patterns, ${confidence.toFixed(1)}% confidence`);
+              }}
+            />
+            <SelfAuditSystem 
+              isActive={isActive}
+              onVulnerabilityFound={(check) => {
+                addLog("warning", `🔍 VULNERABILITY: ${check.name} - ${check.details}`);
+              }}
+            />
+            <OriginAnchorSystem 
+              isActive={isActive}
+              onRestoreTriggered={() => {
+                addLog("success", "🔒 ORIGIN RESTORED: System restored to verified safe state");
+              }}
+              onIntegrityBreach={(module) => {
+                addLog("error", `⚠️ INTEGRITY BREACH: ${module.name} hash mismatch detected`);
+              }}
+            />
           </div>
 
           {/* Bottom - Terminal Log */}
