@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect } from "react";
 import Header from "@/components/Header";
 import Vortex from "@/components/Vortex";
 import ThreatPanel from "@/components/ThreatPanel";
-import SystemStatus from "@/components/SystemStatus";
 import DataStream from "@/components/DataStream";
 import TerminalLog from "@/components/TerminalLog";
 import TestPanel from "@/components/TestPanel";
@@ -17,7 +16,6 @@ import ZeroDayTrainingMode from "@/components/ZeroDayTrainingMode";
 import SelfAuditSystem from "@/components/SelfAuditSystem";
 import OriginAnchorSystem from "@/components/OriginAnchorSystem";
 import { RedirectDestination } from "@/components/AttackDestinationsPanel";
-
 interface Threat {
   id: string;
   type: string;
