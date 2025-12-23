@@ -1,8 +1,111 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Rate limiting store (in-memory, resets on cold start)
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT = 30; // requests per window
+const RATE_WINDOW_MS = 60000; // 1 minute
+
+// Get allowed origins from environment or use defaults
+const getAllowedOrigins = (): string[] => {
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS');
+  if (envOrigins) {
+    return envOrigins.split(',').map(o => o.trim());
+  }
+  // Default allowed origins (Lovable preview domains + localhost)
+  return [
+    'http://localhost:8080',
+    'http://localhost:3000',
+    'http://localhost:5173',
+  ];
+};
+
+const getCorsHeaders = (origin: string | null): Record<string, string> => {
+  const allowedOrigins = getAllowedOrigins();
+  // Check if origin matches allowed patterns (including Lovable preview domains)
+  const isAllowed = origin && (
+    allowedOrigins.includes(origin) ||
+    origin.endsWith('.lovable.app') ||
+    origin.endsWith('.lovableproject.com')
+  );
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : '',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+};
+
+// Validate URL format and security
+const validateUrl = (url: string): { valid: boolean; error?: string } => {
+  if (!url || typeof url !== 'string') {
+    return { valid: false, error: 'Valid URL is required' };
+  }
+
+  // Limit URL length
+  if (url.length > 2048) {
+    return { valid: false, error: 'URL exceeds maximum length' };
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    
+    // Only allow http and https protocols
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return { valid: false, error: 'Only HTTP/HTTPS URLs are allowed' };
+    }
+    
+    const hostname = parsedUrl.hostname.toLowerCase();
+    
+    // Block localhost and loopback
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      return { valid: false, error: 'Local addresses are not allowed' };
+    }
+    
+    // Block private IP ranges (SSRF protection)
+    const ipv4Pattern = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = hostname.match(ipv4Pattern);
+    if (match) {
+      const [, a, b, c] = match.map(Number);
+      // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
+      if (a === 10 || 
+          (a === 172 && b >= 16 && b <= 31) || 
+          (a === 192 && b === 168) ||
+          (a === 169 && b === 254) ||
+          a === 0) {
+        return { valid: false, error: 'Private network addresses are not allowed' };
+      }
+    }
+    
+    return { valid: true };
+  } catch {
+    return { valid: false, error: 'Invalid URL format' };
+  }
+};
+
+// Check rate limit
+const checkRateLimit = (clientIp: string): boolean => {
+  const now = Date.now();
+  const record = rateLimitStore.get(clientIp);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(clientIp, { count: 1, resetTime: now + RATE_WINDOW_MS });
+    return true;
+  }
+  
+  if (record.count >= RATE_LIMIT) {
+    return false;
+  }
+  
+  record.count++;
+  return true;
+};
+
+// Get client IP from headers
+const getClientIp = (req: Request): string => {
+  return req.headers.get('cf-connecting-ip') ||
+         req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+         req.headers.get('x-real-ip') ||
+         'unknown';
 };
 
 interface VirusTotalAnalysisStats {
@@ -21,31 +124,65 @@ interface VirusTotalResult {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Only allow POST
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const clientIp = getClientIp(req);
+
+  // Rate limiting
+  if (!checkRateLimit(clientIp)) {
+    console.warn(`Rate limit exceeded for IP: ${clientIp}`);
+    return new Response(
+      JSON.stringify({ error: 'Too many requests. Please try again later.', code: 'RATE_LIMITED' }),
+      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
-    const { url } = await req.json();
-    
-    if (!url) {
-      console.error("No URL provided");
+    let body;
+    try {
+      body = await req.json();
+    } catch {
       return new Response(
-        JSON.stringify({ error: "URL is required" }),
+        JSON.stringify({ error: 'Invalid request body', code: 'INVALID_REQUEST' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { url } = body;
+    
+    // Validate URL
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({ error: validation.error, code: 'VALIDATION_ERROR' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const apiKey = Deno.env.get('VIRUSTOTAL_API_KEY');
     if (!apiKey) {
-      console.error("VirusTotal API key not configured");
+      console.error('VirusTotal API key not configured');
       return new Response(
-        JSON.stringify({ error: "VirusTotal API key not configured" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Service temporarily unavailable', code: 'CONFIG_ERROR' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Scanning URL: ${url}`);
+    console.log(`Scanning URL from ${clientIp}: ${url.substring(0, 50)}...`);
 
     // Step 1: Submit URL for scanning
     const urlId = btoa(url).replace(/=/g, '');
@@ -61,8 +198,7 @@ serve(async (req) => {
     let analysisData;
     
     if (analysisResponse.status === 404) {
-      // URL not in database, submit for scanning
-      console.log("URL not found, submitting for scan...");
+      console.log('URL not found in VirusTotal, submitting for scan...');
       
       const submitResponse = await fetch('https://www.virustotal.com/api/v3/urls', {
         method: 'POST',
@@ -74,11 +210,10 @@ serve(async (req) => {
       });
 
       if (!submitResponse.ok) {
-        const errorText = await submitResponse.text();
-        console.error(`VirusTotal submit error: ${submitResponse.status} - ${errorText}`);
+        console.error(`VirusTotal submit failed with status: ${submitResponse.status}`);
         return new Response(
-          JSON.stringify({ error: `VirusTotal API error: ${submitResponse.status}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Unable to scan URL at this time', code: 'SCAN_ERROR' }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -86,7 +221,6 @@ serve(async (req) => {
       const analysisId = submitData.data?.id;
       
       if (analysisId) {
-        // Wait briefly and fetch analysis results
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         const resultResponse = await fetch(`https://www.virustotal.com/api/v3/analyses/${analysisId}`, {
@@ -103,11 +237,10 @@ serve(async (req) => {
     } else if (analysisResponse.ok) {
       analysisData = await analysisResponse.json();
     } else {
-      const errorText = await analysisResponse.text();
-      console.error(`VirusTotal error: ${analysisResponse.status} - ${errorText}`);
+      console.error(`VirusTotal lookup failed with status: ${analysisResponse.status}`);
       return new Response(
-        JSON.stringify({ error: `VirusTotal API error: ${analysisResponse.status}` }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Unable to retrieve scan results', code: 'LOOKUP_ERROR' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -170,10 +303,9 @@ serve(async (req) => {
     );
 
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in scan-url function:', error);
+    console.error('Unexpected error in scan-url function:', error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'An unexpected error occurred', code: 'INTERNAL_ERROR' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
