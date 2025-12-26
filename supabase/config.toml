@@ -1,11 +1,5 @@
 project_id = "aoivnbfqpyrqfmoqjtur"
 
-# These functions are intentionally public (verify_jwt = false) because:
-# 1. The app monitors connections automatically without requiring user login
-# 2. Rate limiting is implemented inside each function
-# 3. CORS is restricted to allowed origins
-# 4. Input validation prevents abuse
-
 [functions.check-ip-threat]
 verify_jwt = false
 
@@ -13,4 +7,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.scan-url]
+verify_jwt = false
+
+[functions.virus-definitions]
 verify_jwt = false
