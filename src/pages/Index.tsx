@@ -15,6 +15,9 @@ import QuantumDefensePanel from "@/components/QuantumDefensePanel";
 import ZeroDayTrainingMode from "@/components/ZeroDayTrainingMode";
 import SelfAuditSystem from "@/components/SelfAuditSystem";
 import OriginAnchorSystem from "@/components/OriginAnchorSystem";
+import VirusDefinitionsPanel from "@/components/VirusDefinitionsPanel";
+import NetworkSecurityAdvisor from "@/components/NetworkSecurityAdvisor";
+import MaliciousAppsDatabase from "@/components/MaliciousAppsDatabase";
 import { RedirectDestination } from "@/components/AttackDestinationsPanel";
 interface Threat {
   id: string;
@@ -195,6 +198,15 @@ const Index = () => {
             <OriginAnchorSystem isActive={isActive} onRestoreTriggered={() => addLog("success", "Origin restored")} onIntegrityBreach={(m) => addLog("error", `Breach: ${m.name}`)} />
             <SelfAuditSystem isActive={isActive} onVulnerabilityFound={(c) => addLog("warning", `Vuln: ${c.name}`)} />
           </div>
+
+          {/* Virus Definitions + Network Security */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <VirusDefinitionsPanel isActive={isActive} onUpdateComplete={() => addLog("success", "Virus definitions updated")} />
+            <NetworkSecurityAdvisor isActive={isActive} />
+          </div>
+
+          {/* Malicious Apps Database */}
+          <MaliciousAppsDatabase isActive={isActive} onThreatFound={(app) => addLog("error", `Malicious app: ${app.name}`)} />
 
           {/* Terminal Log */}
           <TerminalLog logs={logs} />
